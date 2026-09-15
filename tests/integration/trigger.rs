@@ -1,4 +1,5 @@
 use crate::common::{do_flush, ExecRows, TempDatabase};
+use asserting::prelude::*;
 
 #[turso_macros::test(mvcc)]
 fn test_create_trigger(db: TempDatabase) {
@@ -638,17 +639,11 @@ fn test_alter_table_drop_column_fails_when_trigger_references_new_column(db: Tem
     .unwrap();
 
     // Attempting to drop column y should fail because trigger references it
-    let result = conn.execute("ALTER TABLE t DROP COLUMN y");
-    assert!(
-        result.is_err(),
-        "Dropping column y should fail when trigger references NEW.y"
-    );
-
-    let error_msg = result.unwrap_err().to_string();
-    assert!(
-        error_msg.contains("error in trigger") && error_msg.contains("after drop column"),
-        "Error should mention column drop and trigger: {error_msg}",
-    );
+    assert_that!(conn.execute("ALTER TABLE t DROP COLUMN y"))
+        .err()
+        .display_string()
+        .contains("error in trigger")
+        .contains("after drop column");
 }
 
 #[turso_macros::test(mvcc)]
@@ -668,17 +663,11 @@ fn test_alter_table_drop_column_fails_when_trigger_references_old_column(db: Tem
     .unwrap();
 
     // Attempting to drop column y should fail because trigger references it
-    let result = conn.execute("ALTER TABLE t DROP COLUMN y");
-    assert!(
-        result.is_err(),
-        "Dropping column y should fail when trigger references OLD.y"
-    );
-
-    let error_msg = result.unwrap_err().to_string();
-    assert!(
-        error_msg.contains("error in trigger") && error_msg.contains("after drop column"),
-        "Error should mention column drop and trigger: {error_msg}",
-    );
+    assert_that!(conn.execute("ALTER TABLE t DROP COLUMN y"))
+        .err()
+        .display_string()
+        .contains("error in trigger")
+        .contains("after drop column");
 }
 
 #[turso_macros::test(mvcc)]
@@ -698,17 +687,11 @@ fn test_alter_table_drop_column_fails_when_trigger_references_unqualified_column
     .unwrap();
 
     // Attempting to drop column y should fail because trigger references it
-    let result = conn.execute("ALTER TABLE t DROP COLUMN y");
-    assert!(
-        result.is_err(),
-        "Dropping column y should fail when trigger references it in WHEN clause"
-    );
-
-    let error_msg = result.unwrap_err().to_string();
-    assert!(
-        error_msg.contains("error in trigger") && error_msg.contains("after drop column"),
-        "Error should mention column drop and trigger: {error_msg}",
-    );
+    assert_that!(conn.execute("ALTER TABLE t DROP COLUMN y"))
+        .err()
+        .display_string()
+        .contains("error in trigger")
+        .contains("after drop column");
 }
 
 #[turso_macros::test(mvcc)]
@@ -770,17 +753,11 @@ fn test_alter_table_drop_column_from_other_table_causes_parse_error_when_trigger
     assert_eq!(columns[0], ("z".to_string(),));
 
     // Now trying to insert into t should fail because trigger references non-existent column zer
-    let result = conn.execute("INSERT INTO t VALUES (1)");
-    assert!(
-        result.is_err(),
-        "Insert should fail because trigger references non-existent column zer"
-    );
-
-    let error_msg = result.unwrap_err().to_string();
-    assert!(
-        error_msg.contains("no column named") || error_msg.contains("zer"),
-        "Error should mention missing column: {error_msg}",
-    );
+    assert_that!(conn.execute("INSERT INTO t VALUES (1)"))
+        .err()
+        .display_string()
+        .contains("no column named")
+        .contains("zer");
 }
 
 #[turso_macros::test(mvcc)]
@@ -905,17 +882,11 @@ fn test_alter_table_rename_column_fails_when_trigger_when_clause_references_colu
     .unwrap();
 
     // Rename column y to y_new should fail (SQLite fails if WHEN clause references the column)
-    let result = conn.execute("ALTER TABLE t RENAME COLUMN y TO y_new");
-    assert!(
-        result.is_err(),
-        "RENAME COLUMN should fail when trigger WHEN clause references the column"
-    );
-
-    let error_msg = result.unwrap_err().to_string();
-    assert!(
-        error_msg.contains("error in trigger") && error_msg.contains("no such column"),
-        "Error should mention trigger and column: {error_msg}",
-    );
+    assert_that!(conn.execute("ALTER TABLE t RENAME COLUMN y TO y_new"))
+        .err()
+        .display_string()
+        .contains("error in trigger")
+        .contains("no such column");
 }
 
 #[turso_macros::test(mvcc)]
@@ -988,11 +959,7 @@ fn test_alter_table_drop_column_fails_with_old_reference_in_update_trigger(db: T
     .unwrap();
 
     // Attempting to drop column y should fail
-    let result = conn.execute("ALTER TABLE t DROP COLUMN y");
-    assert!(
-        result.is_err(),
-        "Dropping column y should fail when UPDATE trigger references OLD.y"
-    );
+    assert_that!(conn.execute("ALTER TABLE t DROP COLUMN y")).is_err();
 }
 
 #[turso_macros::test(mvcc)]
@@ -1389,11 +1356,7 @@ fn test_alter_table_drop_column_allows_when_insert_targets_owning_table(db: Temp
     conn.execute("ALTER TABLE t DROP COLUMN x").unwrap();
 
     // Verify that executing the trigger now causes an error
-    let result = conn.execute("INSERT INTO t VALUES (5)");
-    assert!(
-        result.is_err(),
-        "INSERT should fail because trigger references dropped column"
-    );
+    assert_that!(conn.execute("INSERT INTO t VALUES (5)")).is_err();
 }
 
 #[turso_macros::test(mvcc)]
@@ -1417,11 +1380,7 @@ fn test_alter_table_drop_column_allows_when_update_set_targets_owning_table(db: 
     conn.execute("ALTER TABLE t DROP COLUMN x").unwrap();
 
     // Verify that executing the trigger now causes an error
-    let result = conn.execute("INSERT INTO t VALUES (5)");
-    assert!(
-        result.is_err(),
-        "INSERT should fail because trigger references dropped column"
-    );
+    assert_that!(conn.execute("INSERT INTO t VALUES (5)")).is_err();
 }
 
 #[turso_macros::test(mvcc)]
@@ -1446,17 +1405,11 @@ fn test_alter_table_rename_column_qualified_reference_to_trigger_table(db: TempD
     .unwrap();
 
     // Rename column x to x_new in table t should fail (SQLite fails with "no such column: t.x")
-    let result = conn.execute("ALTER TABLE t RENAME COLUMN x TO x_new");
-    assert!(
-        result.is_err(),
-        "RENAME COLUMN should fail when trigger uses qualified reference to trigger table"
-    );
-
-    let error_msg = result.unwrap_err().to_string();
-    assert!(
-        error_msg.contains("error in trigger") || error_msg.contains("no such column"),
-        "Error should mention trigger or column: {error_msg}",
-    );
+    assert_that!(conn.execute("ALTER TABLE t RENAME COLUMN x TO x_new"))
+        .err()
+        .display_string()
+        .contains("error in trigger")
+        .contains("no such column");
 }
 
 #[turso_macros::test(mvcc)]
@@ -2011,8 +1964,10 @@ fn test_changes_after_trigger_abort_resets_to_zero(db: TempDatabase) {
     )
     .unwrap();
 
-    let err = conn.execute("INSERT INTO t VALUES (1)").unwrap_err();
-    assert!(err.to_string().contains("boom"));
+    assert_that!(conn.execute("INSERT INTO t VALUES (1)"))
+        .err()
+        .display_string()
+        .contains("boom");
 
     let changes: Vec<(i64,)> = conn.exec_rows("SELECT changes()");
     assert_eq!(changes, vec![(0,)]);
@@ -2037,8 +1992,10 @@ fn test_changes_after_trigger_fail_keeps_direct_row_count(db: TempDatabase) {
     )
     .unwrap();
 
-    let err = conn.execute("INSERT INTO t VALUES (1)").unwrap_err();
-    assert!(err.to_string().contains("boom"));
+    assert_that!(conn.execute("INSERT INTO t VALUES (1)"))
+        .err()
+        .display_string()
+        .contains("boom");
 
     let changes: Vec<(i64,)> = conn.exec_rows("SELECT changes()");
     assert_eq!(changes, vec![(1,)]);
@@ -2063,8 +2020,10 @@ fn test_changes_after_trigger_rollback_resets_to_zero(db: TempDatabase) {
     )
     .unwrap();
 
-    let err = conn.execute("INSERT INTO t VALUES (1)").unwrap_err();
-    assert!(err.to_string().contains("boom"));
+    assert_that!(conn.execute("INSERT INTO t VALUES (1)"))
+        .err()
+        .display_string()
+        .contains("boom");
 
     let changes: Vec<(i64,)> = conn.exec_rows("SELECT changes()");
     assert_eq!(changes, vec![(0,)]);
@@ -2107,8 +2066,10 @@ fn test_changes_after_foreign_key_failure_reset_to_zero(db: TempDatabase) {
     conn.execute("CREATE TABLE c(pid REFERENCES p(id))")
         .unwrap();
 
-    let err = conn.execute("INSERT INTO c VALUES (1)").unwrap_err();
-    assert!(err.to_string().contains("FOREIGN KEY constraint failed"));
+    assert_that!(conn.execute("INSERT INTO c VALUES (1)"))
+        .err()
+        .display_string()
+        .contains("FOREIGN KEY constraint failed");
 
     let changes: Vec<(i64,)> = conn.exec_rows("SELECT changes()");
     assert_eq!(changes, vec![(0,)]);
